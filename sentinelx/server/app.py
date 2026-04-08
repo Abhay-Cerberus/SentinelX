@@ -592,10 +592,14 @@ async def websocket_endpoint(websocket: WebSocket, session_id: Optional[str] = N
                 result = env.step(action)
                 obs_dict = result.model_dump() if hasattr(result, "model_dump") else result.__dict__
                 
+                # DEBUG: Log what we're about to send
+                reward_to_send = float(result.reward or 0.0)
+                logger.info(f"Step result: reward={result.reward}, reward_to_send={reward_to_send}, obs_dict_reward={obs_dict.get('reward')}")
+                
                 await websocket.send_json({
                     "session_id": session_id,
                     "observation": obs_dict,
-                    "reward": float(result.reward or 0.0),
+                    "reward": reward_to_send,
                     "done": bool(result.done)
                 })
                 

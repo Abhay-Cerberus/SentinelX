@@ -15,7 +15,7 @@ Environment variables:
     SENTINELX_URL  — Running env URL (default: http://localhost:8000)
 """
 from __future__ import annotations
-
+import asyncio
 import json
 import os
 import sys
@@ -28,17 +28,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from sentinelx.client import SentinelXEnv
+from sentinelx.server.environment import SentinelXEnvironment
 from sentinelx.models import FraudAction
 
 # ---------------------------------------------------------------------------
-# Configuration
+# Configuration (Aligned with official baseline)
 # ---------------------------------------------------------------------------
 
-# LLM Configuration
-# To use Ollama locally, set API_BASE_URL and MODEL_NAME in your .env file.
-# Default for Ollama: API_BASE_URL=http://localhost:11434/v1, MODEL_NAME=qwen2.5:7b
-API_KEY       = os.getenv("OPENAI_API_KEY") or os.getenv("HF_TOKEN") or "ollama"
+API_KEY       = os.getenv("HF_TOKEN") or os.getenv("API_KEY") or os.getenv("OPENAI_API_KEY") or "ollama"
 API_BASE_URL  = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME    = os.getenv("MODEL_NAME",   "Qwen/Qwen2.5-7B-Instruct")
 ENV_URL       = os.getenv("SENTINELX_URL") or "http://localhost:7860"
@@ -54,7 +51,7 @@ TASKS = [
 ]
 
 # ---------------------------------------------------------------------------
-# System prompt
+# System Prompt (Advanced Steering)
 # ---------------------------------------------------------------------------
 
 SYSTEM_PROMPT = textwrap.dedent("""
@@ -63,30 +60,48 @@ Your mission: Protect the financial ecosystem by investigating and resolving sus
 
 RULES OF ENGAGEMENT:
 1. MAX 5 INVESTIGATIONS: You must make a final decision (APPROVE or BLOCK) within 5 steps of starting.
-2. EVIDENCE CHAIN: Use 'query_velocity' -> 'check_device_history' -> 'ip_reputation' to build a case.
+2. EVIDENCE CHAIN: Use 'query_velocity' -> 'check_device_history' -> 'lookup_ip_reputation' to build a case.
 3. DECISIVENESS: Once you see a high-risk signal (e.g. 5x velocity spike or spoofed device), BLOCK immediately.
 4. JSON ONLY: Respond only with a raw JSON object.
 
 EXAMPLE OF A SUCCESSFUL DECISION:
-Step 1 reasoning: "Amount is high; checking velocity." -> query_velocity
-Step 2 reasoning: "Velocity is normal but location is new; checking device." -> check_device_history
-Step 3 reasoning: "Device history shows multiple accounts on this phone; this is fraud." -> block_transaction
+Step 1 reasoning: \"Amount is high; checking velocity.\" -> query_velocity
+Step 2 reasoning: \"Velocity is normal but location is new; checking device.\" -> check_device_history
+Step 3 reasoning: \"Device history shows multiple accounts on this phone; this is fraud.\" -> block_transaction
 
 RESPONSE FORMAT:
 {
-  "action_type": "<action_name>",
-  "parameters": {},
-  "reasoning": "<short analysis mapping evidence to risk>"
+  \"action_type\": \"<action_name>\",
+  \"parameters\": {},
+  \"reasoning\": \"<short analysis mapping evidence to risk>\"
 }
 """).strip()
 
+# ---------------------------------------------------------------------------
+# Official Logging Utilities
+# ---------------------------------------------------------------------------
+
+def log_start(task: str, env: str, model: str) -> None:
+    print(f"[START] task={task} env={env} model={model}", flush=True)
+
+def log_step(step: int, action: str, reward: float, done: bool, error: Optional[str]) -> None:
+    error_val = error if error else "null"
+    done_val = str(done).lower()
+    print(
+        f"[STEP] step={step} action={action} reward={reward:.2f} done={done_val} error={error_val}",
+        flush=True,
+    )
+
+def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> None:
+    rewards_str = ",".join(f"{r:.2f}" for r in rewards)
+    # Baseline requires 3 decimal places for score
+    print(f"[END] success={str(success).lower()} steps={steps} score={score:.3f} rewards={rewards_str}", flush=True)
 
 # ---------------------------------------------------------------------------
-# LLM client
+# Helpers
 # ---------------------------------------------------------------------------
 
 client = OpenAI(api_key=API_KEY or "no-key", base_url=API_BASE_URL)
-
 
 def call_llm(messages: List[Dict[str, str]]) -> str:
     """Call the LLM and return the raw content string."""
@@ -105,21 +120,21 @@ def call_llm(messages: List[Dict[str, str]]) -> str:
             "reasoning": f"LLM error: {exc}",
         })
 
-
 def parse_action(raw: str) -> FraudAction:
     """Extract a FraudAction from LLM output, with safe fallback."""
     raw = raw.strip()
-    # Strip markdown code fences if present
     if raw.startswith("```"):
         raw = raw.split("```")[1]
         if raw.startswith("json"):
             raw = raw[4:]
     try:
         data = json.loads(raw)
+        atype = str(data.get("action_type", "monitor_only")).strip()
+        reasons = str(data.get("reasoning", "")).strip()
         return FraudAction(
-            action_type=data.get("action_type", "monitor_only"),
+            action_type=atype,
             parameters=data.get("parameters", {}),
-            reasoning=data.get("reasoning", ""),
+            reasoning=reasons,
         )
     except Exception:
         return FraudAction(
@@ -139,7 +154,7 @@ def build_user_message(obs_dict: Dict[str, Any], force_terminal: bool = False) -
 
     # Transaction info
     txn = obs_dict.get("transaction", {})
-    amount = txn.get("amount") or "?"
+    amount = txn.get("amount", "?")
     lines.append(f"TRANSACTION: ID={txn.get('transaction_id', '?')}, Amount=${amount}, Merchant={txn.get('merchant', '?')}, Location={txn.get('location', '?')}")
 
     # Profile info
@@ -149,9 +164,10 @@ def build_user_message(obs_dict: Dict[str, Any], force_terminal: bool = False) -
     # Revealed Data
     lines.append("\n### REVEALED EVIDENCE ###")
     found_any = False
-    for key in ["velocity_data", "device_history", "ip_reputation", "behavioral_biometrics", "active_sessions"]:
+    fields = ["velocity_data", "device_history", "ip_reputation", "network_connections", "behavioral_biometrics", "active_sessions", "temporal_pattern", "business_registration"]
+    for key in fields:
         val = obs_dict.get(key)
-        if val:
+        if val is not None:
             lines.append(f"- {key.upper()}: {json.dumps(val)}")
             found_any = True
     if not found_any:
@@ -169,139 +185,101 @@ def build_user_message(obs_dict: Dict[str, Any], force_terminal: bool = False) -
     
     return "\n".join(lines)
 
+# ---------------------------------------------------------------------------
+# Core Async Loop
+# ---------------------------------------------------------------------------
 
-def run_episode(task_id: str, seed: int) -> Dict[str, Any]:
+async def run_episode(task_id: str, seed: int) -> Dict[str, Any]:
     """Run one full episode and return result dict."""
     rewards: List[float] = []
-    step = 0
+    steps_taken = 0
+    score = 0.0
     success = False
-    last_error: Optional[str] = None
-    final_score = 0.0
-
-    print(f"[START] task={task_id} env={BENCHMARK} model={MODEL_NAME}", flush=True)
+    
+    log_start(task=task_id, env=BENCHMARK, model=MODEL_NAME)
 
     try:
-        with SentinelXEnv(base_url=ENV_URL).sync() as env:
-            try:
-                result = env.reset(task_id=task_id, seed=seed)
-                messages: List[Dict[str, str]] = [{"role": "system", "content": SYSTEM_PROMPT}]
+        env = SentinelXEnvironment()
+        result = env.reset(task_id=task_id, seed=seed)
+        messages: List[Dict[str, str]] = [{"role": "system", "content": SYSTEM_PROMPT}]
 
-                for step in range(1, MAX_STEPS + 1):
-                    obs = result.observation
-                    obs_dict = obs.model_dump() if hasattr(obs, "model_dump") else obs.__dict__
-                    
-                    # Track what we've found to steer the agent
-                    evidence_found = []
-                    if obs.velocity_data: evidence_found.append("velocity_data")
-                    if obs.device_history: evidence_found.append("device_history")
-                    if obs.ip_reputation: evidence_found.append("ip_reputation")
-                    if obs.behavioral_biometrics: evidence_found.append("behavioral_biometrics")
-                    if obs.active_sessions: evidence_found.append("active_sessions")
+        for step in range(1, MAX_STEPS + 1):
+            obs = result
+            obs_dict = obs.model_dump() if hasattr(obs, "model_dump") else obs.__dict__
+            
+            # Logic-Guided Steering Hints
+            evidence_found = [f for f in ["velocity_data", "device_history", "ip_reputation", "network_connections", "behavioral_biometrics", "active_sessions"] if getattr(obs, f, None) is not None]
+            if step > EXPLORATION_LIMIT:
+                last_action = obs_dict.get("last_action_result", "")
+                messages.append({"role": "system", "content": f"⚠️ TIMER ALERT: Step {step}/{MAX_STEPS}. Investigation phase CLOSED. You must choose a final decision action NOW (approve_transaction, block_transaction, request_3ds, etc). No more queries allowed."})
+            elif step == EXPLORATION_LIMIT:
+                messages.append({"role": "system", "content": f"ℹ️ PLANNING WINDOW: You have gathered initial signals. PREPARE your final decision for step {EXPLORATION_LIMIT + 1}."})
+            elif evidence_found:
+                messages.append({"role": "system", "content": f"ANALYSIS HINT: You found {', '.join(evidence_found)}. Factor this into your risk model."})
 
-                    # Logic-Guided Steering
-                    if step > EXPLORATION_LIMIT:
-                        steering = f"CRITICAL: Step {step}/{MAX_STEPS}. You have gathered significant evidence ({', '.join(evidence_found) or 'initial profile'}). "
-                        steering += "You MUST now conclude the case with 'approve_transaction' or 'block_transaction' based on your findings."
-                        messages.append({"role": "system", "content": steering})
-                    elif evidence_found:
-                        messages.append({
-                            "role": "system", 
-                            "content": f"ANALYSIS HINT: You have gathered {', '.join(evidence_found)}. Evaluate these signals against the user's typical behavior."
-                        })
+            # Build conversation turn
+            user_msg = build_user_message(obs_dict, force_terminal=(step > EXPLORATION_LIMIT))
+            messages.append({"role": "user", "content": user_msg})
 
-                    # Build conversation turn
-                    user_msg = build_user_message(obs_dict, force_terminal=(step >= 10))
-                    messages.append({"role": "user", "content": user_msg})
+            # Get LLM action
+            raw = call_llm(messages)
+            action = parse_action(raw)
 
-                    # Get LLM action
-                    raw = call_llm(messages)
-                    action = parse_action(raw)
+            # Add assistant turn to history
+            messages.append({"role": "assistant", "content": raw})
 
-                    # Add assistant turn to history
-                    messages.append({"role": "assistant", "content": raw})
+            # Step environment
+            result = env.step(action)
+            
+            reward = float(result.reward or 0.0)
+            # Force done=True if a terminal action (decision/regulation) is taken
+            terminal_actions = {"approve_transaction", "block_transaction", "request_3ds", "send_push_notification", "force_password_reset", "temporarily_freeze_account", "file_sar", "file_ctr", "escalate_to_compliance"}
+            is_terminal_action = action.action_type in terminal_actions
+            done = bool(result.done) or is_terminal_action or (step == MAX_STEPS)
+            
+            rewards.append(reward)
+            steps_taken = step
+            
+            action_str = f"{action.action_type}({json.dumps(action.parameters) if action.parameters else ''})"
+            log_step(step=step, action=action_str, reward=reward, done=done, error=None)
 
-                    # Step environment
-                    result = env.step(action)
-                    reward = float(result.reward or 0.0)
-                    done = bool(result.done)
+            if done:
+                break
 
-                    rewards.append(round(reward, 2))
-                    action_str = f"{action.action_type}({json.dumps(action.parameters) if action.parameters else ''})"
+        # Scoring: sum rewards, clamp [0,1]
+        total_raw = sum(rewards)
+        score = round(max(0.0, min(1.0, total_raw)), 3)
+        success = score > 0.3
 
-                    print(
-                        f"[STEP]  step={step} action={action_str} "
-                        f"reward={reward:.2f} done={'true' if done else 'false'} "
-                        f"error=null",
-                        flush=True,
-                    )
-                    if action.reasoning:
-                        print(f"        reasoning: {action.reasoning}", flush=True)
-
-                    if done:
-                        success = reward > 0
-                        break
-
-            except Exception as exc:
-                last_error = f"Runtime error: {exc}"
-                print(
-                    f"[STEP]  step={step} action=error reward=0.00 done=true error={last_error}",
-                    flush=True,
-                )
     except Exception as exc:
-        last_error = f"Connection error: {exc}"
-        print(
-            f"[STEP]  step=0 action=connection reward=0.00 done=true error={last_error}",
-            flush=True,
-        )
-        print(f"FAILED to connect to environment at {ENV_URL}. Is the server running?", file=sys.stderr)
+        print(f"[DEBUG] Episode failed: {exc}", flush=True)
+        log_step(step=steps_taken + 1, action="error", reward=0.0, done=True, error=str(exc))
 
-    # Compute final score: sum of positive rewards, capped to [0,1]
-    if rewards:
-        total = sum(rewards)
-        final_score = round(max(0.0, min(1.0, total)), 2)
-        success = final_score > 0.3
+    log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
+    return {"task_id": task_id, "score": score, "steps": steps_taken}
 
-    rewards_str = ",".join(f"{r:.2f}" for r in rewards)
-    print(
-        f"[END]   success={'true' if success else 'false'} "
-        f"steps={step} score={final_score:.2f} "
-        f"rewards={rewards_str}",
-        flush=True,
-    )
-
-    return {
-        "task_id": task_id,
-        "success": success,
-        "steps": step,
-        "score": final_score,
-        "rewards": rewards,
-    }
-
-
-# ---------------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------------
-
-if __name__ == "__main__":
-    print(f"# SentinelX Baseline Inference", flush=True)
+async def main() -> None:
+    print(f"# SentinelX Baseline Inference (Async Mode)", flush=True)
     print(f"# Model : {MODEL_NAME}", flush=True)
     print(f"# Env   : {ENV_URL}", flush=True)
-    print(f"# Tasks : {[t['task_id'] for t in TASKS]}", flush=True)
     print("", flush=True)
 
-    all_results = []
     start_time = time.time()
-
+    all_results = []
+    
     for task in TASKS:
-        result = run_episode(task["task_id"], task["seed"])
-        all_results.append(result)
+        res = await run_episode(task["task_id"], task["seed"])
+        all_results.append(res)
         print("", flush=True)
 
     elapsed = round(time.time() - start_time, 1)
-    avg_score = round(sum(r["score"] for r in all_results) / len(all_results), 2)
+    avg_score = round(sum(r["score"] for r in all_results) / len(all_results), 3)
 
     print(f"# === SUMMARY ===", flush=True)
     print(f"# Total time : {elapsed}s", flush=True)
-    print(f"# Avg score  : {avg_score}", flush=True)
+    print(f"# Avg score  : {avg_score:.3f}", flush=True)
     for r in all_results:
-        print(f"#   {r['task_id']:35s}  score={r['score']:.2f}  steps={r['steps']}", flush=True)
+        print(f"#   {r['task_id']:35s}  score={r['score']:.3f}  steps={r['steps']}", flush=True)
+
+if __name__ == "__main__":
+    asyncio.run(main())
