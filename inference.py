@@ -39,7 +39,7 @@ from sentinelx.models import FraudAction
 API_KEY       = os.getenv("OPENAI_API_KEY") or os.getenv("HF_TOKEN") or os.getenv("API_KEY", "")
 API_BASE_URL  = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME    = os.getenv("MODEL_NAME",   "Qwen/Qwen2.5-7B-Instruct")
-ENV_URL       = os.getenv("SENTINELX_URL", "http://localhost:8000")
+ENV_URL       = os.getenv("SENTINELX_URL", "http://localhost:7860")
 BENCHMARK     = "sentinelx"
 MAX_STEPS     = 12
 TEMPERATURE   = 0.2
