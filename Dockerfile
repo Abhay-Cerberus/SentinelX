@@ -3,6 +3,7 @@ FROM python:3.11-slim AS builder
 
 WORKDIR /build
 COPY pyproject.toml .
+COPY README.md .
 COPY sentinelx/ ./sentinelx/
 COPY tasks/ ./tasks/
 COPY data/ ./data/
