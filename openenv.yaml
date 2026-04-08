@@ -5,3 +5,54 @@ description: >
   An AI agent acts as a fraud analyst investigating suspicious transactions
   across three escalating tasks: stolen card, account takeover, and money
   laundering network analysis.
+
+author: Abhay Maheshwari
+license: MIT
+tags:
+  - finance
+  - fraud-detection
+  - reinforcement-learning
+  - openenv
+
+tasks:
+  - id: stolen-card-easy
+    description: Detect and block a stolen card transaction with clear anomaly signals
+    difficulty: easy
+    expected_score_range: [0.85, 0.95]
+    
+  - id: account-takeover-medium
+    description: Identify account takeover via behavioral biometrics and session analysis
+    difficulty: medium
+    expected_score_range: [0.60, 0.75]
+    
+  - id: money-laundering-hard
+    description: Unravel a multi-hop money laundering network and file regulatory reports
+    difficulty: hard
+    expected_score_range: [0.35, 0.55]
+
+server:
+  port: 7860
+  health_check: /health
+  endpoints:
+    reset: /reset
+    step: /step
+    state: /state
+    web: /web
+    docs: /docs
+
+action_space:
+  type: FraudAction
+  description: |
+    Actions include investigation (query_velocity, check_device_history, etc.),
+    intervention (approve_transaction, block_transaction, etc.), and
+    regulatory (file_sar, file_ctr, escalate_to_compliance).
+
+observation_space:
+  type: FraudObservation
+  description: |
+    Partial view of environment state. Transaction and user_profile are always
+    visible. Other fields (velocity_data, device_history, etc.) are revealed
+    by investigation actions.
+
+reward_range: [-1.0, 1.0]
+max_steps_per_episode: 20

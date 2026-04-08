@@ -5,6 +5,11 @@ colorFrom: blue
 colorTo: indigo
 sdk: docker
 pinned: false
+tags:
+  - openenv
+  - finance
+  - fraud-detection
+  - reinforcement-learning
 ---
 
 # SentinelX — Financial Fraud Investigation Environment
