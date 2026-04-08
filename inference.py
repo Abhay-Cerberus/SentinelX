@@ -176,52 +176,60 @@ def run_episode(task_id: str, seed: int) -> Dict[str, Any]:
 
     print(f"[START] task={task_id} env={BENCHMARK} model={MODEL_NAME}", flush=True)
 
-    with SentinelXEnv(base_url=ENV_URL).sync() as env:
-        try:
-            result = env.reset(task_id=task_id, seed=seed)
-            messages: List[Dict[str, str]] = [{"role": "system", "content": SYSTEM_PROMPT}]
+    try:
+        with SentinelXEnv(base_url=ENV_URL).sync() as env:
+            try:
+                result = env.reset(task_id=task_id, seed=seed)
+                messages: List[Dict[str, str]] = [{"role": "system", "content": SYSTEM_PROMPT}]
 
-            for step in range(1, MAX_STEPS + 1):
-                obs = result.observation
-                obs_dict = obs.model_dump() if hasattr(obs, "model_dump") else obs.__dict__
+                for step in range(1, MAX_STEPS + 1):
+                    obs = result.observation
+                    obs_dict = obs.model_dump() if hasattr(obs, "model_dump") else obs.__dict__
 
-                # Build conversation turn
-                user_msg = build_user_message(obs_dict)
-                messages.append({"role": "user", "content": user_msg})
+                    # Build conversation turn
+                    user_msg = build_user_message(obs_dict)
+                    messages.append({"role": "user", "content": user_msg})
 
-                # Get LLM action
-                raw = call_llm(messages)
-                action = parse_action(raw)
+                    # Get LLM action
+                    raw = call_llm(messages)
+                    action = parse_action(raw)
 
-                # Add assistant turn to history
-                messages.append({"role": "assistant", "content": raw})
+                    # Add assistant turn to history
+                    messages.append({"role": "assistant", "content": raw})
 
-                # Step environment
-                result = env.step(action)
-                reward = float(result.reward or 0.0)
-                done = bool(result.done)
-                last_error = None
+                    # Step environment
+                    result = env.step(action)
+                    reward = float(result.reward or 0.0)
+                    done = bool(result.done)
+                    last_error = None
 
-                rewards.append(round(reward, 2))
-                action_str = f"{action.action_type}({json.dumps(action.parameters) if action.parameters else ''})"
+                    rewards.append(round(reward, 2))
+                    action_str = f"{action.action_type}({json.dumps(action.parameters) if action.parameters else ''})"
 
+                    print(
+                        f"[STEP]  step={step} action={action_str} "
+                        f"reward={reward:.2f} done={'true' if done else 'false'} "
+                        f"error={'null' if not last_error else last_error}",
+                        flush=True,
+                    )
+
+                    if done:
+                        success = reward > 0
+                        break
+
+            except Exception as exc:
+                last_error = f"Runtime error: {exc}"
                 print(
-                    f"[STEP]  step={step} action={action_str} "
-                    f"reward={reward:.2f} done={'true' if done else 'false'} "
-                    f"error={'null' if not last_error else last_error}",
+                    f"[STEP]  step={step} action=error reward=0.00 done=true error={last_error}",
                     flush=True,
                 )
-
-                if done:
-                    success = reward > 0
-                    break
-
-        except Exception as exc:
-            last_error = str(exc)
-            print(
-                f"[STEP]  step={step} action=error reward=0.00 done=true error={last_error}",
-                flush=True,
-            )
+    except Exception as exc:
+        last_error = f"Connection error: {exc}"
+        print(
+            f"[STEP]  step=0 action=connection reward=0.00 done=true error={last_error}",
+            flush=True,
+        )
+        print(f"FAILED to connect to environment at {ENV_URL}. Is the server running?", file=sys.stderr)
 
         # Compute final score: sum of positive rewards, capped to [0,1]
         if rewards:

@@ -14,7 +14,8 @@ _ROOT = Path(__file__).resolve().parent.parent
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+
 from fastapi.responses import HTMLResponse
 from sentinelx.server.environment import SentinelXEnvironment
 from sentinelx.models import FraudAction
@@ -542,10 +543,78 @@ async def web_ui():
     """
     return HTMLResponse(content=html)
 
+
+# ============================================================================
+# WebSocket Endpoint (Real-time Interaction)
+# ============================================================================
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket, session_id: Optional[str] = None):
+    """WebSocket handler for persistent environment sessions."""
+    await websocket.accept()
+    
+    # Get or create session
+    session_id, env = get_session_env(session_id)
+    logger.info(f"WebSocket connection established: session={session_id}")
+    
+    try:
+        while True:
+            data = await websocket.receive_json()
+            command = data.get("command") or data.get("type", "step")
+            
+            if command == "reset":
+                task_id = data.get("task_id", "stolen-card-easy")
+                seed = data.get("seed", 42)
+                result = env.reset(task_id=task_id, seed=seed)
+                
+                obs_dict = result.model_dump() if hasattr(result, "model_dump") else result.__dict__
+                await websocket.send_json({
+                    "session_id": session_id,
+                    "observation": obs_dict,
+                    "done": False,
+                    "reward": None
+                })
+                
+            elif command == "state":
+                s = env.state
+                state_dict = s.model_dump() if hasattr(s, "model_dump") else s.__dict__
+                await websocket.send_json({
+                    "session_id": session_id,
+                    "state": state_dict
+                })
+                
+            else: # Default to step
+                # Parse action
+                action = FraudAction(
+                    action_type=data.get("action_type", "monitor_only"),
+                    parameters=data.get("parameters", {}),
+                    reasoning=data.get("reasoning", ""),
+                )
+                
+                result = env.step(action)
+                obs_dict = result.model_dump() if hasattr(result, "model_dump") else result.__dict__
+                
+                await websocket.send_json({
+                    "session_id": session_id,
+                    "observation": obs_dict,
+                    "reward": float(result.reward or 0.0),
+                    "done": bool(result.done)
+                })
+                
+    except WebSocketDisconnect:
+        logger.info(f"WebSocket disconnected: session={session_id}")
+    except Exception as e:
+        logger.exception(f"WebSocket error in session {session_id}")
+        try:
+            await websocket.send_json({"error": str(e)})
+        except:
+            pass
+
 def main():
     """Run the FastAPI server."""
-    logger.info("Starting SentinelX server on port 7860...")
-    uvicorn.run("server.app:app", host="0.0.0.0", port=7860, reload=True)
+    port = int(os.getenv("PORT", 7860))
+    logger.info(f"Starting SentinelX server on port {port}...")
+    uvicorn.run("server.app:app", host="0.0.0.0", port=port, reload=True)
 
 
 if __name__ == "__main__":
