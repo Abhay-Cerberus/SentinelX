@@ -33,6 +33,138 @@ def get_env() -> SentinelXEnvironment:
         logger.info("Environment ready!")
     return _env_instance
 
+
+# ============================================================================
+# Root / Landing Page
+# ============================================================================
+
+@app.get("/")
+async def root():
+    """Landing page with links to available endpoints."""
+    html = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>SentinelX — Fraud Investigation Environment</title>
+        <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { 
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 20px;
+            }
+            .container { 
+                background: white; 
+                border-radius: 12px; 
+                box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+                max-width: 800px;
+                padding: 50px;
+                text-align: center;
+            }
+            h1 { 
+                font-size: 3em; 
+                color: #667eea;
+                margin-bottom: 10px;
+            }
+            .subtitle {
+                font-size: 1.2em;
+                color: #666;
+                margin-bottom: 40px;
+            }
+            .description {
+                background: #f8f9fa;
+                padding: 20px;
+                border-radius: 8px;
+                margin-bottom: 40px;
+                text-align: left;
+                line-height: 1.6;
+            }
+            .description h2 {
+                color: #333;
+                margin-bottom: 10px;
+            }
+            .description p {
+                color: #666;
+                margin-bottom: 10px;
+            }
+            .links {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 15px;
+                margin-bottom: 30px;
+            }
+            a {
+                display: block;
+                padding: 20px;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                text-decoration: none;
+                border-radius: 8px;
+                font-weight: 600;
+                transition: transform 0.2s;
+            }
+            a:hover {
+                transform: translateY(-3px);
+                box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+            }
+            .info {
+                background: #e7f3ff;
+                border-left: 4px solid #667eea;
+                padding: 15px;
+                border-radius: 4px;
+                text-align: left;
+                color: #333;
+                font-size: 0.9em;
+            }
+            .info strong { color: #667eea; }
+            @media (max-width: 600px) {
+                .links { grid-template-columns: 1fr; }
+                h1 { font-size: 2em; }
+                .container { padding: 30px; }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🛡️ SentinelX</h1>
+            <p class="subtitle">Financial Fraud Investigation Environment</p>
+            
+            <div class="description">
+                <h2>What is SentinelX?</h2>
+                <p>
+                    SentinelX is a <strong>reinforcement learning environment</strong> where AI agents act as financial fraud analysts. 
+                    The environment simulates three real-world fraud scenarios with increasing difficulty.
+                </p>
+                <p>
+                    <strong>Key Feature:</strong> An adaptive adversary learns from the agent's detection patterns and escalates tactics across episodes.
+                </p>
+            </div>
+
+            <div class="links">
+                <a href="/web">🎮 Play Interactive UI</a>
+                <a href="/docs">📚 API Documentation</a>
+                <a href="/health">💚 Health Check</a>
+                <a href="/openapi.json">⚙️ OpenAPI Spec</a>
+            </div>
+
+            <div class="info">
+                <strong>📖 How it works:</strong><br>
+                1. Call <code>/reset</code> to start an episode<br>
+                2. Call <code>/step</code> to take actions (investigate or intervene)<br>
+                3. Receive observations and rewards<br>
+                4. Episode ends when you make a final decision<br><br>
+                <strong>🎯 Three Tasks:</strong> Stolen Card (Easy) → Account Takeover (Medium) → Money Laundering (Hard)
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html)
+
 # ============================================================================
 # Health Check
 # ============================================================================
