@@ -43,8 +43,8 @@ API_BASE_URL  = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME    = os.getenv("MODEL_NAME",   "Qwen/Qwen2.5-7B-Instruct")
 ENV_URL       = os.getenv("SENTINELX_URL", "http://localhost:7860")
 BENCHMARK     = "sentinelx"
-MAX_STEPS     = 12
-TEMPERATURE   = 0.2
+MAX_STEPS     = 15
+TEMPERATURE   = 0.3
 
 TASKS = [
     {"task_id": "stolen-card-easy",       "seed": 42},
@@ -57,30 +57,21 @@ TASKS = [
 # ---------------------------------------------------------------------------
 
 SYSTEM_PROMPT = textwrap.dedent("""
-You are SentinelX, an expert financial fraud analyst AI.
-Your job is to investigate suspicious transactions and make decisions.
+You are an elite Fraud Security Analyst at SentinelX.
+Your mission: Protect the financial ecosystem by investigating and resolving suspicious transactions.
 
-## WORKFLOW
-1. Read the transaction and user profile carefully.
-2. Call investigation actions to gather evidence (velocity, device, IP, biometrics, network).
-3. Once you have enough evidence, take a decisive action (block, approve, freeze, file SAR, etc).
-4. Always provide a clear reasoning for your action.
+RULES OF ENGAGEMENT:
+1. EXPLORE: Use investigation actions like 'query_velocity', 'check_device_history', or 'ip_reputation' (Limit: 3-5 steps).
+2. DECIDE: Once you have gathered sufficient signals, 'approve_transaction' or 'block_transaction' immediately.
+3. EFFICIENCY: Your score is based on ACCURACY and SPEED. Prolonged investigation reduces your final rating.
+4. JSON ONLY: Respond only with a raw JSON object.
 
-## RESPONSE FORMAT
-You MUST respond with a single JSON object and nothing else:
+RESPONSE FORMAT:
 {
-  "action_type": "<one of the available_actions>",
+  "action_type": "<action_name>",
   "parameters": {},
-  "reasoning": "<your reasoning>"
+  "reasoning": "<short analysis of why this action covers the risk>"
 }
-
-For query_linked_accounts, include depth in parameters: {"depth": 2}
-
-## KEY RULES
-- Do NOT approve a transaction unless you are confident it is legitimate.
-- For money laundering: always check depth-2 network and temporal_pattern before filing SAR.
-- For account takeover: check behavioral_biometrics and active_sessions first.
-- Respond ONLY with the JSON object — no markdown, no explanation outside it.
 """).strip()
 
 
@@ -214,6 +205,8 @@ def run_episode(task_id: str, seed: int) -> Dict[str, Any]:
                         f"error={'null' if not last_error else last_error}",
                         flush=True,
                     )
+                    if action.reasoning:
+                        print(f"        reasoning: {action.reasoning}", flush=True)
 
                     if done:
                         success = reward > 0
