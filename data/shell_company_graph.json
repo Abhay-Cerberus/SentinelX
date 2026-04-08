@@ -1,0 +1,38 @@
+{
+  "nodes": {
+    "U003": {"type": "individual", "name": "Rajiv Patel", "country": "US", "flagged": false},
+    "Consulting_LLC_Delaware": {"type": "shell_company", "name": "Consulting LLC (DE)", "country": "US", "registered": "2023-11-01", "employees": 0, "flagged": true},
+    "Payroll_Solutions_LLC": {"type": "shell_company", "name": "Payroll Solutions LLC", "country": "US", "registered": "2023-10-15", "employees": 0, "flagged": true},
+    "TechVentures_LLC": {"type": "shell_company", "name": "TechVentures LLC", "country": "US", "registered": "2023-11-12", "employees": 0, "flagged": true},
+    "GlobalTrade_Ltd": {"type": "shell_company", "name": "GlobalTrade Ltd", "country": "US", "registered": "2023-09-28", "employees": 0, "flagged": true},
+    "RetailOps_Inc": {"type": "shell_company", "name": "RetailOps Inc", "country": "US", "registered": "2023-12-01", "employees": 0, "flagged": true},
+    "Offshore_Holdings_BVI": {"type": "offshore_entity", "name": "Offshore Holdings (BVI)", "country": "VG", "registered": "2022-03-14", "flagged": true},
+    "Cayman_Investments": {"type": "offshore_entity", "name": "Cayman Peak Investments", "country": "KY", "registered": "2021-08-05", "flagged": true},
+    "CryptoExchange_FastTrade": {"type": "exchange", "name": "FastTrade Crypto Exchange", "country": "MT", "flagged": true},
+    "WireTransfer_Global": {"type": "msb", "name": "Global Wire Transfer Services", "country": "US", "flagged": false},
+    "BUSSOC0012": {"type": "individual", "name": "Business Account 0012", "country": "US", "flagged": false},
+    "BUSSOC0043": {"type": "individual", "name": "Business Account 0043", "country": "US", "flagged": false},
+    "BUSSOC0078": {"type": "individual", "name": "Business Account 0078", "country": "US", "flagged": false}
+  },
+  "edges": [
+    {"from": "U003",        "to": "Consulting_LLC_Delaware", "amount": 9800.00,  "date": "2024-04-02", "memo": "consulting services"},
+    {"from": "BUSSOC0012", "to": "Consulting_LLC_Delaware", "amount": 9500.00,  "date": "2024-04-02", "memo": "consulting services"},
+    {"from": "BUSSOC0043", "to": "Payroll_Solutions_LLC",   "amount": 9750.00,  "date": "2024-04-02", "memo": "payroll processing"},
+    {"from": "BUSSOC0078", "to": "TechVentures_LLC",        "amount": 9900.00,  "date": "2024-04-01", "memo": "IT services"},
+    {"from": "BUSSOC0012", "to": "GlobalTrade_Ltd",         "amount": 9600.00,  "date": "2024-03-28", "memo": "trade services"},
+    {"from": "Consulting_LLC_Delaware", "to": "Offshore_Holdings_BVI", "amount": 28000.00, "date": "2024-04-03", "memo": "investment"},
+    {"from": "Payroll_Solutions_LLC",   "to": "Offshore_Holdings_BVI", "amount": 19000.00, "date": "2024-04-03", "memo": "investment"},
+    {"from": "TechVentures_LLC",        "to": "Cayman_Investments",    "amount": 15000.00, "date": "2024-04-03", "memo": "capital contribution"},
+    {"from": "GlobalTrade_Ltd",         "to": "Offshore_Holdings_BVI", "amount": 12000.00, "date": "2024-04-04", "memo": "proceeds"},
+    {"from": "Offshore_Holdings_BVI",   "to": "CryptoExchange_FastTrade", "amount": 55000.00, "date": "2024-04-05", "memo": "crypto purchase"},
+    {"from": "Cayman_Investments",      "to": "CryptoExchange_FastTrade", "amount": 12000.00, "date": "2024-04-05", "memo": "crypto purchase"}
+  ],
+  "structuring_pattern": {
+    "description": "47 business accounts routing near-threshold ($9000-$9999) transfers to the same 5 shell companies on overlapping dates",
+    "total_amount": 456700.00,
+    "account_count": 47,
+    "shell_company_count": 5,
+    "date_range": "2024-03-25 to 2024-04-02",
+    "coordination_score": 0.94
+  }
+}

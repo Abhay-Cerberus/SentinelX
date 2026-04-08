@@ -1,0 +1,7 @@
+name: sentinelx
+version: "1.0.0"
+description: >
+  Financial Fraud Investigation Environment with Adaptive Adversary.
+  An AI agent acts as a fraud analyst investigating suspicious transactions
+  across three escalating tasks: stolen card, account takeover, and money
+  laundering network analysis.

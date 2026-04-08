@@ -1,0 +1,84 @@
+{
+  "vpn_exit_nodes": [
+    "104.28.0.0/14",
+    "172.64.0.0/13",
+    "172.67.0.0/16",
+    "198.41.128.0/17",
+    "103.21.244.0/22",
+    "185.220.101.0/24",
+    "185.220.102.0/24",
+    "45.142.212.0/22"
+  ],
+  "tor_exit_nodes": [
+    "199.87.154.255",
+    "185.220.101.34",
+    "185.220.101.47",
+    "185.220.101.50",
+    "185.220.101.65",
+    "51.75.144.43",
+    "77.247.181.162"
+  ],
+  "datacenter_ranges": [
+    "45.33.0.0/17",
+    "66.175.208.0/20",
+    "92.222.0.0/14",
+    "51.68.0.0/14",
+    "104.168.0.0/15",
+    "162.243.0.0/18"
+  ],
+  "known_fraud_ips": [
+    "185.176.27.13",
+    "91.108.4.200",
+    "194.165.16.11",
+    "45.142.120.8"
+  ],
+  "residential_isp_ranges": [
+    "73.12.0.0/16",
+    "98.22.0.0/16",
+    "209.58.0.0/16",
+    "71.195.0.0/16",
+    "67.180.0.0/16"
+  ],
+  "ip_details": {
+    "104.28.42.17": {
+      "type": "vpn_exit_node",
+      "provider": "Cloudflare",
+      "risk_score": 0.85,
+      "country": "US",
+      "is_hosting": true,
+      "is_proxy": true
+    },
+    "185.220.101.47": {
+      "type": "tor_exit_node",
+      "provider": "Tor Project",
+      "risk_score": 0.98,
+      "country": "DE",
+      "is_hosting": true,
+      "is_proxy": true
+    },
+    "45.33.32.156": {
+      "type": "datacenter",
+      "provider": "Linode",
+      "risk_score": 0.70,
+      "country": "US",
+      "is_hosting": true,
+      "is_proxy": false
+    },
+    "73.12.145.22": {
+      "type": "residential",
+      "provider": "Comcast",
+      "risk_score": 0.05,
+      "country": "US",
+      "is_hosting": false,
+      "is_proxy": false
+    },
+    "98.22.87.101": {
+      "type": "residential",
+      "provider": "AT&T",
+      "risk_score": 0.05,
+      "country": "US",
+      "is_hosting": false,
+      "is_proxy": false
+    }
+  }
+}

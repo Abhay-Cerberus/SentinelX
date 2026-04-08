@@ -1,6 +1,0 @@
-spec_version: 1
-name: sentinel_x
-type: space
-runtime: fastapi
-app: server.app:app
-port: 8000

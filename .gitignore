@@ -1,8 +1,13 @@
 # Personal Files
 ProjectIdea.md
 Structure.md
-
+HF_Deploy.md
+hackerthonSiteData.txt
 
 # Python Files
 venv/
 __pycache__/
+
+# course material
+openenv-course/
+tutorial/

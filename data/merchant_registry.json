@@ -1,0 +1,79 @@
+{
+  "merchants": {
+    "ElectronicsStore_3947": {
+      "name": "ElectroMax Store #3947",
+      "category": "Electronics",
+      "risk_level": "high",
+      "risk_reasons": ["high-value goods", "resale fraud target", "common card-testing vector"],
+      "avg_transaction": 450.00,
+      "typical_hours": "09:00-21:00"
+    },
+    "DigitalGiftCards_Unlimited": {
+      "name": "Digital Gift Cards Unlimited",
+      "category": "Gift Cards",
+      "risk_level": "very_high",
+      "risk_reasons": ["instantly redeemable", "hard to reverse", "account takeover favourite", "money laundering vehicle"],
+      "avg_transaction": 150.00,
+      "typical_hours": "00:00-23:59"
+    },
+    "Consulting_LLC_Delaware": {
+      "name": "Consulting LLC (DE)",
+      "category": "Business Services",
+      "risk_level": "medium",
+      "risk_reasons": ["shell company indicator", "frequent in structuring schemes", "unverifiable services"],
+      "avg_transaction": 9500.00,
+      "typical_hours": "09:00-17:00"
+    },
+    "Whole_Foods_Seattle": {
+      "name": "Whole Foods Market – Seattle",
+      "category": "Grocery",
+      "risk_level": "low",
+      "risk_reasons": [],
+      "avg_transaction": 85.00,
+      "typical_hours": "07:00-22:00"
+    },
+    "Starbucks_Pike_Place": {
+      "name": "Starbucks – Pike Place",
+      "category": "Coffee",
+      "risk_level": "low",
+      "risk_reasons": [],
+      "avg_transaction": 8.50,
+      "typical_hours": "05:00-21:00"
+    },
+    "CryptoExchange_FastTrade": {
+      "name": "FastTrade Crypto Exchange",
+      "category": "Cryptocurrency",
+      "risk_level": "very_high",
+      "risk_reasons": ["irreversible transactions", "money laundering endpoint", "no chargeback"],
+      "avg_transaction": 5000.00,
+      "typical_hours": "00:00-23:59"
+    },
+    "WireTransfer_Global": {
+      "name": "Global Wire Transfer Services",
+      "category": "Wire Transfer",
+      "risk_level": "very_high",
+      "risk_reasons": ["international transfers", "minimal KYC", "structuring endpoint"],
+      "avg_transaction": 8000.00,
+      "typical_hours": "08:00-20:00"
+    },
+    "Amazon_Online": {
+      "name": "Amazon.com",
+      "category": "E-commerce",
+      "risk_level": "low",
+      "risk_reasons": [],
+      "avg_transaction": 55.00,
+      "typical_hours": "00:00-23:59"
+    },
+    "Payroll_Solutions_LLC": {
+      "name": "Payroll Solutions LLC",
+      "category": "Business Services",
+      "risk_level": "medium",
+      "risk_reasons": ["potential front company", "irregular payment patterns"],
+      "avg_transaction": 7500.00,
+      "typical_hours": "09:00-17:00"
+    }
+  },
+  "high_risk_categories": ["Gift Cards", "Cryptocurrency", "Wire Transfer", "Prepaid Cards", "Money Orders"],
+  "medium_risk_categories": ["Electronics", "Jewelry", "Business Services", "Travel"],
+  "low_risk_categories": ["Grocery", "Coffee", "Pharmacy", "Gas Station", "Dining"]
+}
