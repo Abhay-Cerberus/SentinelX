@@ -5,6 +5,7 @@ import json
 import logging
 from typing import Optional
 from pathlib import Path
+from uuid import uuid4
 
 # Ensure the project root is on the path
 _ROOT = Path(__file__).resolve().parent.parent.parent
@@ -21,17 +22,19 @@ logger = logging.getLogger("sentinelx-app")
 
 app = FastAPI(title="SentinelX", version="1.0.0", description="Financial Fraud Investigation Environment")
 
-# Global environment instance (lazy-loaded)
-_env_instance = None
+# Per-session environments (one per user session)
+_sessions: dict[str, SentinelXEnvironment] = {}
 
-def get_env() -> SentinelXEnvironment:
-    """Get or create the environment instance (lazy initialization)."""
-    global _env_instance
-    if _env_instance is None:
-        logger.info("Initializing SentinelXEnvironment...")
-        _env_instance = SentinelXEnvironment()
-        logger.info("Environment ready!")
-    return _env_instance
+def get_session_env(session_id: Optional[str] = None) -> tuple[str, SentinelXEnvironment]:
+    """Get or create an environment for a session."""
+    if session_id is None:
+        session_id = str(uuid4())
+    
+    if session_id not in _sessions:
+        logger.info(f"Creating new environment for session {session_id}")
+        _sessions[session_id] = SentinelXEnvironment()
+    
+    return session_id, _sessions[session_id]
 
 
 # ============================================================================
@@ -180,19 +183,23 @@ async def health():
 # ============================================================================
 
 @app.post("/reset")
-async def reset(task_id: str = "stolen-card-easy", seed: Optional[int] = None):
+async def reset(task_id: str = "stolen-card-easy", seed: Optional[int] = None, session_id: Optional[str] = None):
     """Reset the environment and start a new episode."""
     try:
         if seed is None:
             seed = 42
         
-        env = get_env()
+        session_id, env = get_session_env(session_id)
+        logger.info(f"Reset called: session={session_id}, task_id={task_id}, seed={seed}")
+        
         result = env.reset(task_id=task_id, seed=seed)
+        logger.info(f"Reset successful: done={result.done}, has_transaction={bool(result.transaction)}")
         
         # Serialize observation
         obs_dict = result.model_dump() if hasattr(result, "model_dump") else result.__dict__
         
         return {
+            "session_id": session_id,
             "observation": obs_dict,
             "done": False,
             "reward": None,
@@ -207,10 +214,13 @@ async def reset(task_id: str = "stolen-card-easy", seed: Optional[int] = None):
 # ============================================================================
 
 @app.post("/step")
-async def step(action_data: dict):
+async def step(action_data: dict, session_id: Optional[str] = None):
     """Execute one step in the environment."""
     try:
-        env = get_env()
+        if session_id is None:
+            raise HTTPException(status_code=400, detail="session_id is required. Call /reset first to get a session_id.")
+        
+        session_id, env = get_session_env(session_id)
         
         # Parse action
         action = FraudAction(
@@ -226,10 +236,13 @@ async def step(action_data: dict):
         obs_dict = result.model_dump() if hasattr(result, "model_dump") else result.__dict__
         
         return {
+            "session_id": session_id,
             "observation": obs_dict,
             "reward": float(result.reward or 0.0),
             "done": bool(result.done),
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Error in /step")
         raise HTTPException(status_code=500, detail=f"Step failed: {str(e)}")
@@ -240,13 +253,21 @@ async def step(action_data: dict):
 # ============================================================================
 
 @app.get("/state")
-async def state():
+async def state(session_id: Optional[str] = None):
     """Get the current environment state."""
     try:
-        env = get_env()
+        if session_id is None:
+            raise HTTPException(status_code=400, detail="session_id is required")
+        
+        session_id, env = get_session_env(session_id)
         s = env.state
         state_dict = s.model_dump() if hasattr(s, "model_dump") else s.__dict__
-        return state_dict
+        return {
+            "session_id": session_id,
+            "state": state_dict,
+        }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Error in /state")
         raise HTTPException(status_code=500, detail=f"State failed: {str(e)}")
@@ -432,6 +453,8 @@ async def web_ui():
         </div>
 
         <script>
+            let currentSessionId = null;
+
             async function resetEnv() {
                 const task = document.getElementById('taskSelect').value;
                 const seed = document.getElementById('seedInput').value;
@@ -455,21 +478,31 @@ async def web_ui():
                     }
                     
                     const data = await response.json();
+                    currentSessionId = data.session_id;
                     document.getElementById('observation').innerHTML = JSON.stringify(data.observation, null, 2);
-                    statusDiv.innerHTML = '<div class="success">✓ Episode reset successfully</div>';
+                    statusDiv.innerHTML = '<div class="success">✓ Episode reset (Session: ' + currentSessionId.substring(0, 8) + '...)</div>';
                 } catch (e) {
-                    statusDiv.innerHTML = '<div class="error">Error: ' + e.message + '</div>';
+                    document.getElementById('resetStatus').innerHTML = '<div class="error">Error: ' + e.message + '</div>';
                 }
             }
 
             async function takeAction() {
+                if (!currentSessionId) {
+                    document.getElementById('result').innerHTML = '<div class="error">Error: No active session. Click "Reset Episode" first.</div>';
+                    return;
+                }
+
                 const actionType = document.getElementById('actionSelect').value;
                 const reasoning = document.getElementById('reasoningInput').value;
                 const resultDiv = document.getElementById('result');
                 
                 try {
                     resultDiv.innerHTML = '<div class="success">Executing...</div>';
-                    const response = await fetch('/step', {
+                    
+                    const url = new URL('/step', window.location.origin);
+                    url.searchParams.append('session_id', currentSessionId);
+                    
+                    const response = await fetch(url, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ 
