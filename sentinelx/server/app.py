@@ -1,6 +1,7 @@
 """FastAPI server for SentinelX — follows EcomRLVE-Gym pattern."""
 import sys
 import os
+import uvicorn
 import json
 import logging
 from typing import Optional

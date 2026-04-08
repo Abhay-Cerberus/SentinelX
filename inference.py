@@ -231,19 +231,19 @@ def run_episode(task_id: str, seed: int) -> Dict[str, Any]:
         )
         print(f"FAILED to connect to environment at {ENV_URL}. Is the server running?", file=sys.stderr)
 
-        # Compute final score: sum of positive rewards, capped to [0,1]
-        if rewards:
-            total = sum(rewards)
-            final_score = round(max(0.0, min(1.0, total)), 2)
-            success = final_score > 0.3
+    # Compute final score: sum of positive rewards, capped to [0,1]
+    if rewards:
+        total = sum(rewards)
+        final_score = round(max(0.0, min(1.0, total)), 2)
+        success = final_score > 0.3
 
-        rewards_str = ",".join(f"{r:.2f}" for r in rewards)
-        print(
-            f"[END]   success={'true' if success else 'false'} "
-            f"steps={step} score={final_score:.2f} "
-            f"rewards={rewards_str}",
-            flush=True,
-        )
+    rewards_str = ",".join(f"{r:.2f}" for r in rewards)
+    print(
+        f"[END]   success={'true' if success else 'false'} "
+        f"steps={step} score={final_score:.2f} "
+        f"rewards={rewards_str}",
+        flush=True,
+    )
 
     return {
         "task_id": task_id,

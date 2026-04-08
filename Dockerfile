@@ -41,7 +41,7 @@ USER appuser
 # HF Spaces uses PORT env var (default 7860 externally, we bind to it)
 ENV PORT=7860
 ENV HOST=0.0.0.0
-ENV WORKERS=2
+ENV WORKERS=1
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
 
