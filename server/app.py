@@ -3,7 +3,9 @@ import sys
 import os
 import json
 import logging
+import uvicorn
 from typing import Optional
+
 from pathlib import Path
 from uuid import uuid4
 
@@ -539,3 +541,12 @@ async def web_ui():
     </html>
     """
     return HTMLResponse(content=html)
+
+def main():
+    """Run the FastAPI server."""
+    logger.info("Starting SentinelX server on port 7860...")
+    uvicorn.run("server.app:app", host="0.0.0.0", port=7860, reload=True)
+
+
+if __name__ == "__main__":
+    main()
