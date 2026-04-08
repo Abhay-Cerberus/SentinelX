@@ -11,3 +11,8 @@ __pycache__/
 # course material
 openenv-course/
 tutorial/
+
+# Secrets
+.env
+.env.*
+!.env.example

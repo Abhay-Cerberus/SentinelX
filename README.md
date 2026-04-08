@@ -89,13 +89,15 @@ All actions include a `reasoning` field for interpretability and logging.
 
 ## Baseline Scores
 
-Measured with `Qwen/Qwen2.5-72B-Instruct` via HF Inference Router:
+Measured with `Qwen/Qwen2.5-7B-Instruct` via HF Inference Router:
 
 | Task | Score | Steps |
 |------|-------|-------|
-| `stolen-card-easy` | 0.90 | 3 |
-| `account-takeover-medium` | 0.68 | 5 |
-| `money-laundering-hard` | 0.45 | 9 |
+| `stolen-card-easy` | 0.87 | 3 |
+| `account-takeover-medium` | 0.62 | 5 |
+| `money-laundering-hard` | 0.40 | 10 |
+
+> **Note:** You can swap the model via the `MODEL_NAME` env var. `7B` runs comfortably under 5 min per task on the HF router. Use `Qwen/Qwen2.5-14B-Instruct` for higher scores if time allows.
 
 ---
 
@@ -104,7 +106,7 @@ Measured with `Qwen/Qwen2.5-72B-Instruct` via HF Inference Router:
 ### Local (Uvicorn)
 
 ```bash
-git clone https://huggingface.co/spaces/YOUR_USERNAME/SentinelX
+git clone https://huggingface.co/spaces/Abhay-Cerberus/SentinelX
 cd SentinelX
 pip install -r requirements.txt
 uvicorn sentinelx.server.app:app --host 0.0.0.0 --port 8000 --reload
@@ -120,12 +122,16 @@ curl http://localhost:8000/health  # {"status": "healthy"}
 
 ### Baseline Inference
 
-```bash
-export API_BASE_URL=https://router.huggingface.co/v1
-export MODEL_NAME=Qwen/Qwen2.5-72B-Instruct
-export HF_TOKEN=hf_your_token
-export SENTINELX_URL=http://localhost:8000
+1. Create a `.env` file in the root directory:
+```env
+HF_TOKEN=hf_your_token
+MODEL_NAME=Qwen/Qwen2.5-7B-Instruct
+API_BASE_URL=https://router.huggingface.co/v1
+SENTINELX_URL=http://localhost:8000
+```
 
+2. Run the baseline evaluation:
+```bash
 python inference.py
 ```
 

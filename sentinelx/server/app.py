@@ -17,5 +17,5 @@ from sentinelx.server.environment import SentinelXEnvironment
 #   /state   — HTTP GET
 #   /health  — HTTP GET
 #   /web     — Interactive web UI
-#   /docs    — OpenAPI docs
-app = create_fastapi_app(SentinelXEnvironment)
+from sentinelx.models import FraudAction, FraudObservation
+app = create_fastapi_app(SentinelXEnvironment, FraudAction, FraudObservation)

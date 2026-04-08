@@ -24,6 +24,9 @@ import time
 from typing import Any, Dict, List, Optional
 
 from openai import OpenAI
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from sentinelx.client import SentinelXEnv
 from sentinelx.models import FraudAction
@@ -34,7 +37,7 @@ from sentinelx.models import FraudAction
 
 API_KEY       = os.getenv("HF_TOKEN") or os.getenv("API_KEY", "")
 API_BASE_URL  = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
-MODEL_NAME    = os.getenv("MODEL_NAME",   "Qwen/Qwen2.5-72B-Instruct")
+MODEL_NAME    = os.getenv("MODEL_NAME",   "Qwen/Qwen2.5-7B-Instruct")
 ENV_URL       = os.getenv("SENTINELX_URL", "http://localhost:8000")
 BENCHMARK     = "sentinelx"
 MAX_STEPS     = 12
