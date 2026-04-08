@@ -222,7 +222,3 @@ SentinelX/
 | `/web` | GET | Built-in web interface |
 
 ---
-
-## License
-
-MIT © 2024 Abhay Maheshwari
