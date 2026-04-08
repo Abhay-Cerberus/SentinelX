@@ -35,8 +35,10 @@ from sentinelx.models import FraudAction
 # Configuration
 # ---------------------------------------------------------------------------
 
-# Support both OPENAI_API_KEY and HF_TOKEN for flexibility
-API_KEY       = os.getenv("OPENAI_API_KEY") or os.getenv("HF_TOKEN") or os.getenv("API_KEY", "")
+# LLM Configuration
+# To use Ollama locally, set API_BASE_URL and MODEL_NAME in your .env file.
+# Default for Ollama: API_BASE_URL=http://localhost:11434/v1, MODEL_NAME=qwen2.5:7b
+API_KEY       = os.getenv("OPENAI_API_KEY") or os.getenv("HF_TOKEN") or "ollama"
 API_BASE_URL  = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME    = os.getenv("MODEL_NAME",   "Qwen/Qwen2.5-7B-Instruct")
 ENV_URL       = os.getenv("SENTINELX_URL", "http://localhost:7860")
