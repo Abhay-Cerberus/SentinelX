@@ -61,16 +61,21 @@ You are an elite Fraud Security Analyst at SentinelX.
 Your mission: Protect the financial ecosystem by investigating and resolving suspicious transactions.
 
 RULES OF ENGAGEMENT:
-1. EXPLORE: Use investigation actions like 'query_velocity', 'check_device_history', or 'ip_reputation' (Limit: 3-5 steps).
-2. DECIDE: Once you have gathered sufficient signals, 'approve_transaction' or 'block_transaction' immediately.
-3. EFFICIENCY: Your score is based on ACCURACY and SPEED. Prolonged investigation reduces your final rating.
+1. MAX 5 INVESTIGATIONS: You must make a final decision (APPROVE or BLOCK) within 5 steps of starting.
+2. EVIDENCE CHAIN: Use 'query_velocity' -> 'check_device_history' -> 'ip_reputation' to build a case.
+3. DECISIVENESS: Once you see a high-risk signal (e.g. 5x velocity spike or spoofed device), BLOCK immediately.
 4. JSON ONLY: Respond only with a raw JSON object.
+
+EXAMPLE OF A SUCCESSFUL DECISION:
+Step 1 reasoning: "Amount is high; checking velocity." -> query_velocity
+Step 2 reasoning: "Velocity is normal but location is new; checking device." -> check_device_history
+Step 3 reasoning: "Device history shows multiple accounts on this phone; this is fraud." -> block_transaction
 
 RESPONSE FORMAT:
 {
   "action_type": "<action_name>",
   "parameters": {},
-  "reasoning": "<short analysis of why this action covers the risk>"
+  "reasoning": "<short analysis mapping evidence to risk>"
 }
 """).strip()
 
@@ -182,6 +187,13 @@ def run_episode(task_id: str, seed: int) -> Dict[str, Any]:
                     # Build conversation turn
                     user_msg = build_user_message(obs_dict)
                     messages.append({"role": "user", "content": user_msg})
+
+                    # Inject pressure if investigative loop persists
+                    if step >= 6:
+                        messages.append({
+                            "role": "system", 
+                            "content": "CRITICAL: You have gathered enough evidence. You MUST now call 'approve_transaction' or 'block_transaction' to conclude the case. No further investigation is allowed."
+                        })
 
                     # Get LLM action
                     raw = call_llm(messages)
