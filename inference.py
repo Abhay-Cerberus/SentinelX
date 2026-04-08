@@ -41,10 +41,11 @@ from sentinelx.models import FraudAction
 API_KEY       = os.getenv("OPENAI_API_KEY") or os.getenv("HF_TOKEN") or "ollama"
 API_BASE_URL  = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME    = os.getenv("MODEL_NAME",   "Qwen/Qwen2.5-7B-Instruct")
-ENV_URL       = os.getenv("SENTINELX_URL", "http://localhost:7860")
+ENV_URL       = os.getenv("SENTINELX_URL") or "http://localhost:7860"
 BENCHMARK     = "sentinelx"
 MAX_STEPS     = 15
 TEMPERATURE   = 0.3
+EXPLORATION_LIMIT = 5
 
 TASKS = [
     {"task_id": "stolen-card-easy",       "seed": 42},
@@ -132,35 +133,40 @@ def parse_action(raw: str) -> FraudAction:
 # Episode runner
 # ---------------------------------------------------------------------------
 
-def build_user_message(obs_dict: Dict[str, Any]) -> str:
-    """Build a concise user-turn message from the current observation."""
-    lines = []
+def build_user_message(obs_dict: Dict[str, Any], force_terminal: bool = False) -> str:
+    """Build a robust summary. If force_terminal is true, only show decision actions."""
+    lines = ["### CURRENT OBSERVATION ###"]
 
+    # Transaction info
     txn = obs_dict.get("transaction", {})
-    lines.append("## Current Transaction")
-    lines.append(f"  Amount   : ${txn.get('amount', '?')}")
-    lines.append(f"  Merchant : {txn.get('merchant', '?')}")
-    lines.append(f"  Location : {txn.get('location', '?')}")
-    lines.append(f"  Time     : {txn.get('timestamp', '?')}")
+    amount = txn.get("amount") or "?"
+    lines.append(f"TRANSACTION: ID={txn.get('transaction_id', '?')}, Amount=${amount}, Merchant={txn.get('merchant', '?')}, Location={txn.get('location', '?')}")
 
+    # Profile info
     profile = obs_dict.get("user_profile", {})
-    lines.append("\n## Account Profile")
-    lines.append(f"  Account age    : {profile.get('account_age_days', '?')} days")
-    lines.append(f"  Typical spend  : ${profile.get('typical_transaction_size', '?')}")
-    lines.append(f"  Typical loc    : {profile.get('typical_location', '?')}")
+    lines.append(f"USER_PROFILE: Age={profile.get('account_age_days', '?')} days, Typical_Spend=${profile.get('typical_transaction_size', '?')}")
 
-    summary = obs_dict.get("evidence_summary", "")
-    if summary:
-        lines.append(f"\n## Evidence Summary\n{summary}")
+    # Revealed Data
+    lines.append("\n### REVEALED EVIDENCE ###")
+    found_any = False
+    for key in ["velocity_data", "device_history", "ip_reputation", "behavioral_biometrics", "active_sessions"]:
+        val = obs_dict.get(key)
+        if val:
+            lines.append(f"- {key.upper()}: {json.dumps(val)}")
+            found_any = True
+    if not found_any:
+        lines.append("- (No additional signals revealed yet.)")
 
-    last = obs_dict.get("last_action_result", "")
-    if last:
-        lines.append(f"\n## Last Action Result\n{last}")
-
+    # Filter actions if we are forcing a decision
     available = obs_dict.get("available_actions", [])
-    lines.append(f"\n## Available Actions\n{', '.join(available)}")
-    lines.append(f"\nTime remaining: {obs_dict.get('time_remaining', '?')} ticks")
+    if force_terminal:
+        terminal_only = ["approve_transaction", "block_transaction", "request_3ds", "temporarily_freeze_account", "file_sar", "file_ctr"]
+        available = [a for a in available if a in terminal_only]
+        lines.append("\n!!! IMPORTANT: Investigation tools are now CLOSED. You MUST pick a final decision below. !!!")
 
+    lines.append(f"\nAVAILABLE_ACTIONS: {', '.join(available)}")
+    lines.append(f"LAST_RESULT: {obs_dict.get('last_action_result', 'N/A')}")
+    
     return "\n".join(lines)
 
 
@@ -183,17 +189,29 @@ def run_episode(task_id: str, seed: int) -> Dict[str, Any]:
                 for step in range(1, MAX_STEPS + 1):
                     obs = result.observation
                     obs_dict = obs.model_dump() if hasattr(obs, "model_dump") else obs.__dict__
+                    
+                    # Track what we've found to steer the agent
+                    evidence_found = []
+                    if obs.velocity_data: evidence_found.append("velocity_data")
+                    if obs.device_history: evidence_found.append("device_history")
+                    if obs.ip_reputation: evidence_found.append("ip_reputation")
+                    if obs.behavioral_biometrics: evidence_found.append("behavioral_biometrics")
+                    if obs.active_sessions: evidence_found.append("active_sessions")
 
-                    # Build conversation turn
-                    user_msg = build_user_message(obs_dict)
-                    messages.append({"role": "user", "content": user_msg})
-
-                    # Inject pressure if investigative loop persists
-                    if step >= 6:
+                    # Logic-Guided Steering
+                    if step > EXPLORATION_LIMIT:
+                        steering = f"CRITICAL: Step {step}/{MAX_STEPS}. You have gathered significant evidence ({', '.join(evidence_found) or 'initial profile'}). "
+                        steering += "You MUST now conclude the case with 'approve_transaction' or 'block_transaction' based on your findings."
+                        messages.append({"role": "system", "content": steering})
+                    elif evidence_found:
                         messages.append({
                             "role": "system", 
-                            "content": "CRITICAL: You have gathered enough evidence. You MUST now call 'approve_transaction' or 'block_transaction' to conclude the case. No further investigation is allowed."
+                            "content": f"ANALYSIS HINT: You have gathered {', '.join(evidence_found)}. Evaluate these signals against the user's typical behavior."
                         })
+
+                    # Build conversation turn
+                    user_msg = build_user_message(obs_dict, force_terminal=(step >= 10))
+                    messages.append({"role": "user", "content": user_msg})
 
                     # Get LLM action
                     raw = call_llm(messages)
@@ -206,7 +224,6 @@ def run_episode(task_id: str, seed: int) -> Dict[str, Any]:
                     result = env.step(action)
                     reward = float(result.reward or 0.0)
                     done = bool(result.done)
-                    last_error = None
 
                     rewards.append(round(reward, 2))
                     action_str = f"{action.action_type}({json.dumps(action.parameters) if action.parameters else ''})"
@@ -214,7 +231,7 @@ def run_episode(task_id: str, seed: int) -> Dict[str, Any]:
                     print(
                         f"[STEP]  step={step} action={action_str} "
                         f"reward={reward:.2f} done={'true' if done else 'false'} "
-                        f"error={'null' if not last_error else last_error}",
+                        f"error=null",
                         flush=True,
                     )
                     if action.reasoning:
