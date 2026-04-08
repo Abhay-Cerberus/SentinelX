@@ -34,4 +34,4 @@ build-backend = "hatchling.build"
 packages = ["sentinelx"]
 
 [project.scripts]
-sentinelx-server = "sentinelx.server.app:app"
+sentinelx-server = "server.app:app"
